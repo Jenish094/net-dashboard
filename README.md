@@ -1,0 +1,1 @@
+Its a python app which just scans your network and gives info on it, ill write more stuff later after im done and feel like doing it. It runs on your server PC or even your router in a docker container (I havent added docker yet, right now as of 14/1/26 its just a python script
