@@ -16,8 +16,12 @@ clients = []
 for sent, recieved in result:
     clients.append({'ip': recieved.psrc, 'mac': recieved.hwsrc})
 
+
+
 #print clients
 print("Devices on network")
 print("IP"+ " "*18+"MAC")
 for client in clients:
     print("{:16} {}".format(client['ip'], client['mac']))
+
+clientip = client['ip']
