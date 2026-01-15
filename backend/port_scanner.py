@@ -1,67 +1,85 @@
-import sys
 import socket
-from datetime import datetime
 import requests
-import network_scanner
-# USAGE: python3 port_scanner.py IP_ADDRESS
-def scanports():
-    if len(sys.argv) == 2:
-        target = socket.gethostbyname(sys.argv[1])
-    else:
-        print("Add target ip address or hostname")
+import warnings
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
-    print("Scan Target: " + target)
-    print("Scanning started: " + str(datetime.now()))
+def parseportrange(ports_range):
+    ports = set()
+    parts = str(ports_range).split(',')
+    for p in parts:
+        p = p.strip()
+        if not p:
+            continue
+        if '-' in p:
+            try:
+                a, b = p.split('-', 1)
+                a = int(a); b = int(b)
+                if a < 1: a = 1
+                if b > 65535: b = 65535
+                ports.update(range(a, b + 1))
+            except Exception:
+                continue
+        else:
+            try:
+                v = int(p)
+                if 1 <= v <= 65535:
+                    ports.add(v)
+            except Exception:
+                continue
+    return sorted(ports)
 
-    open_ports = []
 
+def probeport(target_ip, port, timeout):
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s.settimeout(timeout)
     try:
-        for port in range(1,65536):
-            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            socket.setdefaulttimeout(1)
-
-            result = s.connect_ex((target,port))
-            if result ==0:
-                print("Port Number {} is open".format(port))
-                open_ports.append(port)
+        res = s.connect_ex((target_ip, port))
+        print(f"[port_scanner] connect_ex result for {port}: {res}")
+        if res == 0:
+            print(f"[port_scanner] Open port: {port}")
+            entry = {"port": port}
+            try:
+                url = f"http://{target_ip}:{port}"
+                resp = requests.get(url, timeout=2)
+                entry.update({"url": url, "status": resp.status_code})
+                print(f"[port_scanner] Web server detected: {url} (status {resp.status_code})")
+            except Exception:
+                try:
+                    warnings.filterwarnings('ignore')
+                    url = f"https://{target_ip}:{port}"
+                    resp = requests.get(url, timeout=2, verify=False)
+                    entry.update({"url": url, "status": resp.status_code})
+                    print(f"[port_scanner] Web server detected: {url} (status {resp.status_code})")
+                except Exception:
+                    pass
             s.close()
-    except KeyboardInterrupt:
-        print("\n Scan stopped by user")
-        sys.exit()
-    clientip = network_scanner.clientip
-    print(f"client ip: " + clientip)
+            return entry
+    except Exception as e:
+        print(f"[port_scanner] Error probing port {port}: {e}")
+    try:
+        s.close()
+    except Exception:
+        pass
+    return None
 
-#check if a website is hosted on the port
-def check_website():
-    ok = []
-    deny = []
-    for p in open_ports:
-        url = f"http://{clientip}:{p}"
-        print(f"{url}")
-        try:
-            response = requests.get(url, timeout=5)
-            response.raise_for_status()
-            print(f"Status Code: {response.status_code}")
-            if 200 <= response.status_code <= 299:
-                ok.append(response.status_code)
-                ok.append(p)
-                print("WEBSERVER")
-            else:
-                deny.append(p, response.status_code)
-                print("NO WEBSERVER")
-        except requests.exceptions.Timeout:
-            print("Timed out")
-            deny.append((p, "timeout"))
-        except requests.exceptions.ConnectionError:
-            print("Connection error")
-            deny.append((p, "connection_error"))
-        except requests.exceptions.RequestException as e:
-            print(f"Error {e}")
-            deny.append((p, str(e)))
-    print(f"ok list: {ok}, deny list: {deny}")
-    #make a request to the website
 
-#I had to put them into functions for flask
-scanports()
-check_website()
+def scanports(target_ip, ports_range="1-65535", timeout=1.0, max_workers=200):
+    print(f"[port_scanner] TCP connect scanning {target_ip} ports {ports_range}")
+    ports = parseportrange(ports_range)
+    if not ports:
+        print("[port_scanner] No valid ports parsed")
+        return []
 
+    results = []
+    with ThreadPoolExecutor(max_workers=min(max_workers, len(ports))) as ex:
+        futures = {ex.submit(probeport, target_ip, p, timeout): p for p in ports}
+        for fut in as_completed(futures):
+            try:
+                res = fut.result()
+                if res:
+                    results.append(res)
+            except Exception as e:
+                print(f"[port_scanner] probe exception: {e}")
+
+    print(f"[port_scanner] Scan complete: {len(results)} open port entries (may include non-web ports)")
+    return sorted(results, key=lambda x: x['port'])

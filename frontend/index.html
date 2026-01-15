@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>net-dashboard</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+<style>
+    body { background: #f8f9fa; }
+    .clickable { cursor: pointer; }
+</style>
+</head>
+<body>
+    <nav class="navbar navbar-dark bg-dark">
+        <div class="container-fluid">
+            <span class="navbar-brand mb-0 h1">net-dashboard</span>
+        </div>
+    </nav>
+
+    <div class="container py-5">
+    <div class="row justify-content-center mb-4">
+        <div class="col-md-6">
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <h5 class="card-title">Enter Target Network ip</h5>
+                        <form id="scan-form">
+                            <div class="mb-3">
+                                <label for="target_ip" class="form-label">Target IP Range</label>
+                                <input type="text" class="form-control" id="target_ip" placeholder="e.g., 192.168.1 or 192.168.1.0/24" required>
+                                <div class="form-text">Enter subnet (e.g., 192.168.1) or full CIDR notation</div>
+                            </div>
+                            <button type="submit" class="btn btn-primary w-100" id="scan-btn">Scan Network</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="row" id="results-row" style="display:none;">
+            <div class="col-md-4 mb-4">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-primary text-white">
+                        <h6 class="mb-0">📡 IPs Found <span id="ips-count" class="badge bg-light text-dark ms-2">0</span></h6>
+                    </div>
+                    <div class="card-body" style="max-height: 400px; overflow-y: auto;" id="ips-container">
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4 mb-4">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-success text-white">
+                        <h6 class="mb-0">🔌 Open Ports</h6>
+                    </div>
+                    <div class="card-body" style="max-height: 400px; overflow-y: auto;" id="ports-container">
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4 mb-4">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-info text-white">
+                        <h6 class="mb-0">🌐 Web Servers Found</h6>
+                    </div>
+                    <div class="card-body" style="max-height: 400px; overflow-y: auto;" id="webs-container">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    const form = document.getElementById('scan-form');
+    const ipsContainer = document.getElementById('ips-container');
+    const portsContainer = document.getElementById('ports-container');
+    const websContainer = document.getElementById('webs-container');
+    const resultsRow = document.getElementById('results-row');
+    const ipsCount = document.getElementById('ips-count');
+    let lastLogs = '';
+
+    // terminal output
+    const outBtn = document.createElement('button');
+    outBtn.className = 'btn btn-secondary';
+    outBtn.style.position = 'fixed';
+    outBtn.style.right = '20px';
+    outBtn.style.bottom = '20px';
+    outBtn.style.zIndex = '1050';
+    outBtn.textContent = 'Output';
+    document.body.appendChild(outBtn);
+
+    const overlay = document.createElement('div');
+    overlay.style.position = 'fixed';
+    overlay.style.left = '0';
+    overlay.style.top = '0';
+    overlay.style.width = '100%';
+    overlay.style.height = '100%';
+    overlay.style.background = 'rgba(0,0,0,0.6)';
+    overlay.style.display = 'none';
+    overlay.style.zIndex = '1060';
+    overlay.innerHTML = `
+        <div style="position:absolute; right:20px; bottom:20px; width:600px; max-width:95%; max-height:80%; overflow:auto;">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between">
+                    <strong>Terminal Output</strong>
+                    <button id="close-overlay" class="btn btn-sm btn-outline-secondary">Close</button>
+                </div>
+                <div class="card-body" style="background:#000; color:#0f0; font-family: monospace; font-size:12px;">
+                    <pre id="overlay-pre" style="white-space:pre-wrap; word-break:break-word; margin:0;"> </pre>
+                </div>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(overlay);
+    const overlayPre = overlay.querySelector('#overlay-pre');
+    const closeOverlayBtn = overlay.querySelector('#close-overlay');
+    outBtn.addEventListener('click', () => {
+        overlayPre.textContent = lastLogs || 'No output yet';
+        overlay.style.display = '';
+    });
+    closeOverlayBtn.addEventListener('click', () => { overlay.style.display = 'none'; });
+
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const target = document.getElementById('target_ip').value.trim();
+        if (!target) return;
+        //results and loading
+        resultsRow.style.display = '';
+        ipsContainer.innerHTML = '<p>Loading...</p>';
+        portsContainer.innerHTML = '<p class="text-muted">Select an IP to scan ports</p>';
+        websContainer.innerHTML = '<p class="text-muted">Select an IP to scan ports</p>';
+        ipsCount.textContent = '0';
+
+        try {
+            const res = await fetch('/api/scan-network', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ target_ip: target })
+            });
+            const data = await res.json();
+            if (data.error) {
+                ipsContainer.innerHTML = `<div class="text-danger">Error: ${data.error}</div>`;
+                return;
+            }
+
+            const devices = data.devices || [];
+            if (data.logs) lastLogs += data.logs + "\n";
+            ipsCount.textContent = devices.length;
+            if (devices.length === 0) {
+                ipsContainer.innerHTML = '<p class="text-muted">No devices found</p>';
+                return;
+            }
+
+            const ul = document.createElement('ul');
+            ul.className = 'list-group';
+            devices.forEach(dev => {
+                const li = document.createElement('li');
+                li.className = 'list-group-item d-flex justify-content-between align-items-start clickable';
+                li.innerHTML = `<div><strong>${dev.ip}</strong><br><small class="text-muted">${dev.mac || ''}</small></div><span class="badge bg-primary">Scan ports</span>`;
+                li.addEventListener('click', () => scanPorts(dev.ip));
+                ul.appendChild(li);
+            });
+            ipsContainer.innerHTML = '';
+            ipsContainer.appendChild(ul);
+
+        } catch (err) {
+            ipsContainer.innerHTML = `<div class="text-danger">Request failed: ${err}</div>`;
+        }
+    });
+
+    async function scanPorts(ip) {
+        // port range
+        let portsRange = prompt('Enter port range (e.g. 1-1024, 80,443, or all):', '1-65535');
+        if (portsRange === null) return;
+        portsRange = portsRange.trim().toLowerCase();
+        if (!portsRange || portsRange === 'all') portsRange = '1-65535';
+
+        portsContainer.innerHTML = '<p>Loading... (this takes a while depending on the range)</p>';
+        websContainer.innerHTML = '<p>Loading...</p>';
+        try {
+            const timeoutSeconds = 2.0;
+            const res = await fetch('/api/scan-ports', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ target_ip: ip, ports_range: portsRange, timeout: timeoutSeconds })
+            });
+            const data = await res.json();
+            if (data.logs) lastLogs += data.logs + "\n";
+            if (data.error) {
+                portsContainer.innerHTML = `<div class="text-danger">Error: ${data.error}</div>`;
+                websContainer.innerHTML = '';
+                return;
+            }
+
+            const ports = data.ports || [];
+            if (ports.length === 0) {
+                portsContainer.innerHTML = '<p class="text-muted">No open ports found</p>';
+                websContainer.innerHTML = '<p class="text-muted">No web servers found</p>';
+                return;
+            }
+
+            const ulp = document.createElement('ul');
+            ulp.className = 'list-group';
+            const ulw = document.createElement('ul');
+            ulw.className = 'list-group';
+
+            ports.forEach(entry => {
+                const p = entry.port || entry['port'];
+                const item = document.createElement('li');
+                item.className = 'list-group-item';
+                item.textContent = `${ip}:${p}`;
+                ulp.appendChild(item);
+
+                if (entry.url) {
+                    const w = document.createElement('li');
+                    w.className = 'list-group-item';
+                    w.innerHTML = `<a href="${entry.url}" target="_blank">${entry.url}</a>`;
+                    ulw.appendChild(w);
+                }
+            });
+
+            portsContainer.innerHTML = '';
+            portsContainer.appendChild(ulp);
+            websContainer.innerHTML = '';
+            if (ulw.children.length) websContainer.appendChild(ulw);
+            else websContainer.innerHTML = '<p class="text-muted">No web servers found</p>';
+
+        } catch (err) {
+            portsContainer.innerHTML = `<div class="text-danger">Request failed: ${err}</div>`;
+            websContainer.innerHTML = '';
+        }
+    }
+    </script>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
