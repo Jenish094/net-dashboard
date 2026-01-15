@@ -4,34 +4,32 @@ from datetime import datetime
 import requests
 import network_scanner
 # USAGE: python3 port_scanner.py IP_ADDRESS
+def scanports():
+    if len(sys.argv) == 2:
+        target = socket.gethostbyname(sys.argv[1])
+    else:
+        print("Add target ip address or hostname")
 
-if len(sys.argv) == 2:
-    target = socket.gethostbyname(sys.argv[1])
-else:
-    print("Add target ip address or hostname")
+    print("Scan Target: " + target)
+    print("Scanning started: " + str(datetime.now()))
 
-print("Scan Target: " + target)
-print("Scanning started: " + str(datetime.now()))
+    open_ports = []
 
-open_ports = []
+    try:
+        for port in range(1,65536):
+            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            socket.setdefaulttimeout(1)
 
-try:
-    for port in range(1,65536):
-        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        socket.setdefaulttimeout(1)
-
-        result = s.connect_ex((target,port))
-        if result ==0:
-            print("Port Number {} is open".format(port))
-            open_ports.append(port)
-        s.close()
-except KeyboardInterrupt:
-    print("\n Scan stopped by user")
-    sys.exit()
-
-
-clientip = network_scanner.clientip
-print(f"client ip: " + clientip)
+            result = s.connect_ex((target,port))
+            if result ==0:
+                print("Port Number {} is open".format(port))
+                open_ports.append(port)
+            s.close()
+    except KeyboardInterrupt:
+        print("\n Scan stopped by user")
+        sys.exit()
+    clientip = network_scanner.clientip
+    print(f"client ip: " + clientip)
 
 #check if a website is hosted on the port
 def check_website():
@@ -46,6 +44,7 @@ def check_website():
             print(f"Status Code: {response.status_code}")
             if 200 <= response.status_code <= 299:
                 ok.append(response.status_code)
+                ok.append(p)
                 print("WEBSERVER")
             else:
                 deny.append(p, response.status_code)
@@ -62,5 +61,7 @@ def check_website():
     print(f"ok list: {ok}, deny list: {deny}")
     #make a request to the website
 
+#I had to put them into functions for flask
+scanports()
 check_website()
 
