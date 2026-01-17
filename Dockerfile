@@ -6,8 +6,6 @@ COPY . .
 
 RUN pip install --no-cache-dir -r requirements.txt
 
-EXPOSE 5000
-
 WORKDIR /app/backend
 
 CMD ["python3", "app.py"]

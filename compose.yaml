@@ -1,0 +1,7 @@
+services:
+  dashboard:
+    build: .
+    container_name: net-dashboard
+    privileged: true
+    network_mode: host
+    restart: unless-stopped

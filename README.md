@@ -1,1 +1,45 @@
-Its a python app which just scans your network and gives info on it, ill write more stuff later after im done and feel like doing it. It runs on your server PC or even your router in a docker container (I havent added docker yet, right now as of 14/1/26 its just a python script
+ A simple network dashboard for local network and port scanning made in Python.
+
+<p align="center">
+<img src="res/appicon.png" alt="appicon" width="350"/>
+</p>
+
+<strong>
+<p style="text-align:center;">net-dashboard</p>
+</strong>
+
+ ## Prerequisites
+ - Docker
+ - Python 3.12 or later and `pip` (if not using docker)
+ - `sudo` / root privileges
+
+ ## Run with Docker (recommended)
+
+ Run the app using Docker Compose. Because the scanners require root privileges, run the compose command with `sudo` so the container runs as root:
+
+ ```bash
+ sudo docker compose up -d --build
+ ```
+ To stop, use 
+ ```bash
+ sudo docker compose down
+ ```
+ And to check the log output
+ ```bash
+ sudo docker logs -f
+ ```
+
+ Run locally (no Docker)
+
+ Install Python dependencies and run the backend directly. Scapy requires root privileges for scanning, so run with `sudo`:
+
+ ```bash
+ python3 -m pip install -r requirements.txt
+ sudo python3 backend/app.py
+ ```
+
+ ## Notes
+ - If you are on Windows, running docker normally is fine and sudo isn't required.
+ - You can change the port on what the app runs on by changing it in app.py.
+
+
