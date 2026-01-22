@@ -118,11 +118,11 @@
     });
     closeOverlayBtn.addEventListener('click', () => { overlay.style.display = 'none'; });
 
+    // Simulate network and port scans and put in placeholder values
     form.addEventListener('submit', async (e) => {
         e.preventDefault();
         const target = document.getElementById('target_ip').value.trim();
         if (!target) return;
-        //results and loading
         resultsRow.style.display = '';
         ipsContainer.innerHTML = '<p>Loading...</p>';
         portsContainer.innerHTML = '<p class="text-muted">Select an IP to scan ports</p>';
@@ -130,17 +130,7 @@
         ipsCount.textContent = '0';
 
         try {
-            const res = await fetch('/api/scan-network', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ target_ip: target })
-            });
-            const data = await res.json();
-            if (data.error) {
-                ipsContainer.innerHTML = `<div class="text-danger">Error: ${data.error}</div>`;
-                return;
-            }
-
+            const data = await simulateScanNetwork(target);
             const devices = data.devices || [];
             if (data.logs) lastLogs += data.logs + "\n";
             ipsCount.textContent = devices.length;
@@ -160,7 +150,6 @@
             });
             ipsContainer.innerHTML = '';
             ipsContainer.appendChild(ul);
-
         } catch (err) {
             ipsContainer.innerHTML = `<div class="text-danger">Request failed: ${err}</div>`;
         }
@@ -168,21 +157,13 @@
 
     async function scanPorts(ip) {
         // port range
-        let portsRange = prompt('Enter port range (e.g. 1-1024, 80,443, or all):', '1-65535');
+        let portsRange = prompt('Enter port range: (e.g. 1-1024, 80,443, or all):', '1-65535');
         if (portsRange === null) return;
         portsRange = portsRange.trim().toLowerCase();
-        if (!portsRange || portsRange === 'all') portsRange = '1-65535';
-
         portsContainer.innerHTML = '<p>Loading... (this takes a while depending on the range)</p>';
         websContainer.innerHTML = '<p>Loading...</p>';
         try {
-            const timeoutSeconds = 2.0;
-            const res = await fetch('/api/scan-ports', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ target_ip: ip, ports_range: portsRange, timeout: timeoutSeconds })
-            });
-            const data = await res.json();
+            const data = await simulateScanPorts(ip);
             if (data.logs) lastLogs += data.logs + "\n";
             if (data.error) {
                 portsContainer.innerHTML = `<div class="text-danger">Error: ${data.error}</div>`;
@@ -212,7 +193,7 @@
                 if (entry.url) {
                     const w = document.createElement('li');
                     w.className = 'list-group-item';
-                    w.innerHTML = `<a href="${entry.url}" target="_blank">${entry.url}</a>`;
+                    w.innerHTML = `<a href="${entry.url}" target="_blank" rel="noopener noreferrer">${entry.url}</a>`;
                     ulw.appendChild(w);
                 }
             });
@@ -227,6 +208,37 @@
             portsContainer.innerHTML = `<div class="text-danger">Request failed: ${err}</div>`;
             websContainer.innerHTML = '';
         }
+    }
+
+    // Demo Simulation
+    function simulateScanNetwork(target) {
+        return new Promise(resolve => {
+            setTimeout(() => {
+                let base = target;
+                if (base.endsWith('.0')) base = base.slice(0, -2);
+                if (/\/\d+$/.test(base)) base = base.split('/')[0].replace(/\.0+$/, '');
+
+                const devices = [
+                    { ip: `${base}.1`, mac: 'AA:BB:CC:DD:EE:01' },
+                    { ip: `${base}.24`, mac: 'AA:BB:CC:DD:EE:02' },
+                    { ip: `${base}.100`, mac: 'AA:BB:CC:DD:EE:03' }
+                ];
+                resolve({ devices, logs: `Scanned ${target}, found ${devices.length} devices` });
+            }, 800);
+        });
+    }
+
+    function simulateScanPorts(ip) {
+        return new Promise(resolve => {
+            setTimeout(() => {
+                const ports = [
+                    { port: 22 },
+                    { port: 80, url: `http://${ip}` },
+                    { port: 443, url: `https://${ip}` }
+                ];
+                resolve({ ports, logs: `Port scan for ${ip} returned ${ports.length} entries` });
+            }, 1000);
+        });
     }
     </script>
 
