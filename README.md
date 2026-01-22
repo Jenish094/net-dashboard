@@ -7,7 +7,8 @@
 <strong>
 <p style="text-align:center;">net-dashboard</p>
 </strong>
-Available at [jenish094.github.io/net-dashboard](jenish094.github.io/net-dashboard)
+Available at jenish094.github.io/net-dashboard
+
  ## Prerequisites
  - Docker
  - Python 3.12 or later and `pip` (if not using docker)
