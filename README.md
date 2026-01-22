@@ -28,8 +28,14 @@
  ```bash
  sudo docker logs -f
  ```
+## Run using prebuilt .tar file
 
- Run locally (no Docker)
+First, download the ```net-dashboard.tar``` file from the Releases page. Then in a command window, go to the location of the downloaded tar file and run
+```bash
+docker load -i net-dashboard.tar
+docker -it net-dashboard
+```
+ ## Run locally (no Docker)
 
  Install Python dependencies and run the backend directly. Scapy requires root privileges for scanning, so run with `sudo`:
 
