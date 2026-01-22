@@ -35,6 +35,9 @@ First, download the ```net-dashboard.tar``` file from the Releases page. Then in
 docker load -i net-dashboard.tar
 docker -it net-dashboard
 ```
+
+You can access the dashboard on ```localhost:5000``` or on ```DEVICE_IP:5000```
+
  ## Run locally (no Docker)
 
  Install Python dependencies and run the backend directly. Scapy requires root privileges for scanning, so run with `sudo`:
